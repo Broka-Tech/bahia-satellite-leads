@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+sqlalchemy
+pydantic
+playwright
+googlesearch-python
+google-generativeai
+requests
+beautifulsoup4
+python-dotenv
+reportlab

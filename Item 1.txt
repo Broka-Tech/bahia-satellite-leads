@@ -1,0 +1,91 @@
+# services/stealth_radar.py
+import time
+import random
+import pandas as pd
+from googlesearch import search # pip install googlesearch-python
+
+class StealthRadar:
+    def __init__(self):
+        self.target_location = "Salvador"
+        # Keywords que indicam alto poder aquisitivo na Bio
+        self.elite_keywords = [
+            "Médico", "Cirurgião", "Oftalmologista", "Cardiologista",
+            "Advogado", "OAB", "Sócio", "Founder", "CEO", "Diretor",
+            "Empresário", "Investidor", "Construtora", "Arquiteto"
+        ]
+        self.banned_terms = ["loja", "store", "vendas", "atendimento"] # Evitar perfis comerciais
+
+    def gerar_dorks(self):
+        """
+        Cria queries avançadas para o Google (Dorking).
+        Ex: site:instagram.com "Salvador" AND "Médico"
+        """
+        dorks = []
+        for cargo in self.elite_keywords:
+            # Busca perfis que tenham "Salvador" E o "Cargo" na descrição
+            query = f'site:instagram.com "{self.target_location}" "{cargo}" -inurl:p -inurl:reel'
+            dorks.append(query)
+        return dorks
+
+    def executar_reconhecimento(self, max_results=20):
+        print(f"🕵️  Iniciando Varredura Stealth (OSINT) em {self.target_location}...")
+        leads_encontrados = []
+        dorks = self.gerar_dorks()
+
+        for query in dorks:
+            print(f"   🔎 Executando Dork: [{query}]")
+            
+            try:
+                # Pausa humana para não tomar bloqueio do Google (Rate Limit)
+                time.sleep(random.uniform(10, 20)) 
+                
+                # Executa a busca no Google
+                results = search(query, num_results=max_results, advanced=True)
+
+                for result in results:
+                    # O objeto result traz title, description e url
+                    bio_snippet = f"{result.title} {result.description}".lower()
+                    
+                    # Filtro duplo: Tem a keyword de elite? Não é loja?
+                    if any(ban in bio_snippet for ban in self.banned_terms):
+                        continue
+
+                    # Extrai o username da URL
+                    # URL típica: https://www.instagram.com/username/
+                    try:
+                        username = result.url.split("instagram.com/")[1].strip("/").split("?")[0]
+                    except:
+                        continue
+
+                    print(f"      🎯 ALVO IDENTIFICADO: {username} | Info: {result.title[:30]}...")
+                    
+                    leads_encontrados.append({
+                        "username": username,
+                        "url_perfil": result.url,
+                        "origem_dork": query,
+                        "snippet_google": result.description, # O Google já nos dá um pedaço da Bio aqui
+                        "data_deteccao": time.strftime("%Y-%m-%d")
+                    })
+
+            except Exception as e:
+                print(f"      ⚠️ Erro temporário na busca: {e}")
+                time.sleep(60) # Espera 1 min se der erro
+
+        return leads_encontrados
+
+    def salvar_alvos(self, leads):
+        if not leads:
+            print("❌ Nenhum alvo encontrado nesta rodada.")
+            return
+        
+        df = pd.DataFrame(leads)
+        df = df.drop_duplicates(subset=['username'])
+        filename = f"stealth_leads_{int(time.time())}.csv"
+        df.to_csv(filename, index=False)
+        print(f"✅ Sucesso! {len(df)} leads de elite salvos em '{filename}'.")
+
+# Teste isolado
+if __name__ == "__main__":
+    radar = StealthRadar()
+    alvos = radar.executar_reconhecimento(max_results=10) # Baixo para teste rápido
+    radar.salvar_alvos(alvos)
